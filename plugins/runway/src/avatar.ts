@@ -6,6 +6,7 @@ import {
   APIConnectionError,
   APIStatusError,
   DEFAULT_API_CONNECT_OPTIONS,
+  getJobContext,
   intervalForRetry,
   voice,
 } from '@livekit/agents';
@@ -136,6 +137,9 @@ export class AvatarSession {
 
     this.#logger.debug('starting Runway avatar session');
     await this.createSession(livekitUrl, livekitToken, room.name || '', localParticipantIdentity);
+    getJobContext(false)?.addShutdownCallback(async () => {
+      await this.endRunwayRealtimeSession(room);
+    });
 
     agentSession.output.audio = new voice.DataStreamAudioOutput({
       room,
@@ -209,5 +213,26 @@ export class AvatarSession {
     throw new APIConnectionError({
       message: 'Failed to start Runway avatar session after all retries',
     });
+  }
+
+  private async endRunwayRealtimeSession(room: Room): Promise<void> {
+    try {
+      const localParticipant = room.localParticipant;
+      if (!localParticipant) {
+        this.#logger.warn('could not end Runway realtime session; room has no local participant');
+        return;
+      }
+
+      await localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ type: 'END_CALL' })),
+        {
+          reliable: true,
+          destination_identities: [this.avatarParticipantIdentity],
+        },
+      );
+      this.#logger.debug('sent Runway realtime session end call');
+    } catch (error) {
+      this.#logger.warn({ error: String(error) }, 'error ending Runway realtime session');
+    }
   }
 }
