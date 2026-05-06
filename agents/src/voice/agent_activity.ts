@@ -2402,7 +2402,9 @@ export class AgentActivity implements RecognitionHooks {
         { speech_id: speechHandle.id, message: forwardedText },
         'playout completed with interrupt',
       );
-      speechHandle._markGenerationDone();
+      if (speechHandle._hasGenerations) {
+        speechHandle._markGenerationDone();
+      }
       await executeToolsTask.cancelAndWait(AgentActivity.REPLY_TASK_CANCEL_TIMEOUT);
       return;
     }
@@ -2444,7 +2446,9 @@ export class AgentActivity implements RecognitionHooks {
     }
 
     // mark the playout done before waiting for the tool execution
-    speechHandle._markGenerationDone();
+    if (speechHandle._hasGenerations) {
+      speechHandle._markGenerationDone();
+    }
     this._backgroundSpeeches.add(speechHandle);
     try {
       await executeToolsTask.result;
